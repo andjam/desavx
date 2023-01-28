@@ -1,0 +1,157 @@
+//go:build amd64
+// +build amd64
+
+#include "textflag.h"
+
+DATA SBOXES<>+0x00(SB)/8, $0xd2846fb1a93e50c7
+DATA SBOXES<>+0x08(SB)/8, $0x1fd8a374c56b0e92
+DATA SBOXES<>+0x10(SB)/8, $0x7b419ce206adf358
+DATA SBOXES<>+0x18(SB)/8, $0x21e74a8dfc90356b
+
+DATA SBOXES<>+0x20(SB)/8, $0x4b2ef08d3c975a61
+DATA SBOXES<>+0x28(SB)/8, $0xd0b7491ae35c2f86
+DATA SBOXES<>+0x30(SB)/8, $0x14bdc37eaf680592
+DATA SBOXES<>+0x38(SB)/8, $0x6bd814a7950fe23c
+
+DATA SBOXES<>+0x40(SB)/8, $0xc1af92680d34e75b
+DATA SBOXES<>+0x48(SB)/8, $0xaf427c9561de0b38
+DATA SBOXES<>+0x50(SB)/8, $0x9ef528c3704a1db6
+DATA SBOXES<>+0x58(SB)/8, $0x432c95fabe17608d
+
+DATA SBOXES<>+0x60(SB)/8, $0x2c417ab6853fd0e9
+DATA SBOXES<>+0x68(SB)/8, $0xeb2c47d150fa3986
+DATA SBOXES<>+0x70(SB)/8, $0x421bad78f9c5630e
+DATA SBOXES<>+0x78(SB)/8, $0xb8c71e2d6f09a453
+
+DATA SBOXES<>+0x80(SB)/8, $0x7de3069a1285bc4f
+DATA SBOXES<>+0x88(SB)/8, $0xd8b56f03472c1ae9
+DATA SBOXES<>+0x90(SB)/8, $0xa690cb7df13e5284
+DATA SBOXES<>+0x98(SB)/8, $0x3f06a1d8945bc72e
+
+DATA SBOXES<>+0xa0(SB)/8, $0xa09e63f51dc7b428
+DATA SBOXES<>+0xa8(SB)/8, $0xd709346a285ecbf1
+DATA SBOXES<>+0xb0(SB)/8, $0xd6498f30b12c5ae7
+DATA SBOXES<>+0xb8(SB)/8, $0x1ad069874fe3b52c
+
+DATA SBOXES<>+0xc0(SB)/8, $0xf18e6b34972dc05a
+DATA SBOXES<>+0xc8(SB)/8, $0x3d47f28ec01a69b5
+DATA SBOXES<>+0xd0(SB)/8, $0x0e7ba4d158c6932f
+DATA SBOXES<>+0xd8(SB)/8, $0xd8a13f42b67c05e9
+
+DATA SBOXES<>+0xe0(SB)/8, $0xe4d12fb83a6c5907
+DATA SBOXES<>+0xe8(SB)/8, $0x0f74e2d1a6cb9538
+DATA SBOXES<>+0xf0(SB)/8, $0x41e8d62bfc973a50
+DATA SBOXES<>+0xf8(SB)/8, $0xfc8249175b3ea06d
+GLOBL SBOXES<>(SB), (NOPTR+RODATA), $256
+
+TEXT ·substitution(SB),NOSPLIT,$16
+	MOVQ ·in(FP), X0
+	CALL substitutionVec2(SB)
+	MOVQ X0, ·ret+8(FP)
+	RET
+
+TEXT ·substitutionVec2(SB),NOSPLIT,$32
+	VMOVDQU ·in(FP), X0
+	CALL    substitutionVec2(SB)
+	VMOVDQU X0, ·ret+16(FP)
+	RET
+
+TEXT substitutionVec2(SB),NOSPLIT,$8
+	MOVQ SI, (SP)
+#define S   X0
+#define out X2
+	VPXOR out, out, out
+	MOVQ $0, SI
+
+loopstart:
+#define row    X5
+#define column X6
+#define entry  X7
+	MOVQ         $0x0000000000000020, AX
+	MOVQ         AX, X1
+	VPBROADCASTQ X1, X1
+	VPAND        S, X1, X1
+	VPSRLQ       $4, X1, X1
+
+	MOVQ         $0x0000000000000001, AX
+	MOVQ         AX, X4
+	VPBROADCASTQ X4, X4
+	VPAND        S, X4, X4
+
+	VPOR X4, X1, row
+
+	MOVQ         $0x8000800080008000, AX
+	MOVQ         AX, X1
+	VPBROADCASTQ X1, X1
+	LEAQ         SBOXES<>(SB), AX
+	LEAL         (AX)(SI*8), AX
+	VPGATHERQQ   X1, (AX)(row*8), X3
+
+	VPSRLQ       $1, S, X4
+	VPSRLQ       $6, S, X0
+	MOVQ         $0x000000000000000f, AX
+	MOVQ         AX, X1
+	VPBROADCASTQ X1, X1
+	VPAND        X1, X4, column
+
+	MOVQ $0xf000000000000000, AX
+
+	MOVQ AX, BX
+	MOVQ column, CX
+	SHRQ CX, BX
+	SHRQ CX, BX
+	SHRQ CX, BX
+	SHRQ CX, BX
+	MOVQ BX, X1
+
+	MOVQ    AX, BX
+	VPXOR   X4, X4, X4
+	VPSHUFD $0x4e, column, X4
+	MOVQ    X4, CX
+	SHRQ    CX, BX
+	SHRQ    CX, BX
+	SHRQ    CX, BX
+	SHRQ    CX, BX
+	MOVQ    BX, X4
+	VPSHUFD $0x4e, X4, X4
+
+	VPOR    X4, X1, X1
+	VPAND   X1, X3, X1
+	VMOVDQA X1, X3
+
+	MOVQ X1, BX
+	MOVQ column, CX
+	SHLQ CX, BX
+	SHLQ CX, BX
+	SHLQ CX, BX
+	SHLQ CX, BX
+	MOVQ BX, X1
+
+	VPSHUFD $0x4e, X3, X3
+	MOVQ    X3, BX
+	VPXOR   X4, X4, X4
+	VPSHUFD $0x4e, column, X4
+	MOVQ    X4, CX
+	SHLQ    CX, BX
+	SHLQ    CX, BX
+	SHLQ    CX, BX
+	SHLQ    CX, BX
+	VPXOR   X4, X4, X4
+	MOVQ    BX, X4
+	VPSHUFD $0x4e, X4, X4
+
+	VPOR    X4, X1, X1
+	VPSRLQ  $60, X1, entry
+
+	MOVQ   SI, X4
+	VPSLLQ X4, entry, X1
+	VPXOR  X1, out, out
+
+	ADDQ $4, SI
+	CMPQ SI, $32
+	JNE  loopstart
+
+	VMOVDQU out, X0
+
+	MOVQ (SP), SI
+	RET
