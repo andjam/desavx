@@ -7,5 +7,5 @@ package desavx
 // a 32-bit output (stored in the lower 32 bits of the output) mapping 6-bit
 // groups in the input to 4-bit entries in the corresponding substitution boxes
 // defined in table 7.8 of HoAC.
-func substitution(in qw) qw
-func substitutionVec2(in [2]qw) [2]qw
+func substitution(in v64) v64
+func substitutionVec2(in [2]v64) [2]v64

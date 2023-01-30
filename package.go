@@ -33,18 +33,16 @@ import (
 	"golang.org/x/sys/cpu"
 )
 
-const (
-	rounds = 16 // The number of feistel rounds used by DES
-)
-
 type (
-	dw uint32 // A doubleword
-	qw uint64 // A quadword
+	v32 uint32
+	v64 uint64
 )
 
 const (
-	dwSize = int(unsafe.Sizeof(dw(0)))
-	qwSize = int(unsafe.Sizeof(qw(0)))
+	rounds = 16
+
+	v32Size = int(unsafe.Sizeof(v32(0)))
+	v64Size = int(unsafe.Sizeof(v64(0)))
 )
 
 var (
@@ -62,14 +60,14 @@ func init() {
 
 // desECB is a cipher.BlockMode compatible type which encrypts (or decrypts)
 // plaintext bytes using DES in electronic coodebook mode. The 16 48-bit DES
-// subkeys are stored in the lower 48 bits of the 16 qw items in the subkeys
+// subkeys are stored in the lower 48 bits of the 16 v64 items in the subkeys
 // array.
 type desECB struct {
-	subkeys [rounds]qw
+	subkeys [rounds]v64
 }
 
 func (_ desECB) BlockSize() int {
-	return qwSize
+	return v64Size
 }
 
 // CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst. It
@@ -79,7 +77,7 @@ func (_ desECB) BlockSize() int {
 // than the length dst or CryptBlocks will panic. Additional care must to taken
 // to ensure src and dst do not overlap.
 func (de desECB) CryptBlocks(dst, src []byte) {
-	if len(src)%qwSize != 0 {
+	if len(src)%v64Size != 0 {
 		panic(ErrInputSize)
 	}
 	if len(dst) < len(src) {
@@ -91,15 +89,15 @@ func (de desECB) CryptBlocks(dst, src []byte) {
 // desTripleECB is a cipher.BlockMode compatible type which triple encrypts (or
 // decrypts) plaintext bytes using DES in electronic coodebook mode. The 16
 // 48-bit DES subkeys used for stage i are stored in the lower 48 bits of each
-// qw item of the subkeys<i> array.
+// v64 item of the subkeys<i> array.
 type desTripleECB struct {
 	subkeys1,
 	subkeys2,
-	subkeys3 [rounds]qw
+	subkeys3 [rounds]v64
 }
 
 func (_ desTripleECB) BlockSize() int {
-	return qwSize
+	return v64Size
 }
 
 // CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst. It
@@ -110,13 +108,13 @@ func (_ desTripleECB) BlockSize() int {
 // than the length dst or CryptBlocks will panic. Additional care must to taken
 // to ensure src and dst do not overlap.
 func (dte desTripleECB) CryptBlocks(dst, src []byte) {
-	if len(src)%qwSize != 0 {
+	if len(src)%v64Size != 0 {
 		panic(ErrInputSize)
 	}
 	if len(dst) < len(src) {
 		panic(ErrInputSize)
 	}
-	desTripleECBCrypt(&[3][rounds]qw{
+	desTripleECBCrypt(&[3][rounds]v64{
 		dte.subkeys1,
 		dte.subkeys2,
 		dte.subkeys3}, dst, src)
@@ -124,7 +122,7 @@ func (dte desTripleECB) CryptBlocks(dst, src []byte) {
 
 // Apply the left rotation of 1 or 2 to the 28-bit value stored in the lower 28
 // bits of x, for round i, in accordance with the schedule defined in HoAC 7.83.
-func rotation(x qw, i int) qw {
+func rotation(x v64, i int) v64 {
 	switch i {
 	case 1, 2, 9, 16:
 		return x<<37>>36 | x>>27
@@ -138,7 +136,7 @@ func rotation(x qw, i int) qw {
 // and D values (stored in the lower 28 bits of c and d) which will be iterated
 // on successively in calls to ksNext, and used to generate the subkeys for each
 // round.
-func ksStart(key qw) (c, d qw) {
+func ksStart(key v64) (c, d v64) {
 	t := pc1(key)
 	c = t >> 28
 	d = t << 36 >> 36
@@ -148,7 +146,7 @@ func ksStart(key qw) (c, d qw) {
 // Continue the key schedule described in HoAC 7.83. Compute the 28-bit C and D
 // values (stored in the lower 28 bits of c and d), and subkey for round i, from
 // the C and D values from the previous round.
-func ksNext(cprev, dprev qw, i int) (c, d, subkey qw) {
+func ksNext(cprev, dprev v64, i int) (c, d, subkey v64) {
 	c = rotation(cprev, i)
 	d = rotation(dprev, i)
 	subkey = pc2(c<<28 | d)
@@ -160,16 +158,16 @@ func ksNext(cprev, dprev qw, i int) (c, d, subkey qw) {
 // effective size however, is only 56 bits as the least significant bit from
 // each byte is ignored.
 func NewDESECBEncrypter(key []byte) cipher.BlockMode {
-	if len(key) != qwSize {
+	if len(key) != v64Size {
 		panic(ErrKeySize)
 	}
 	keyUint64 := binary.LittleEndian.Uint64(key)
 
 	var (
-		c, d = ksStart(qw(keyUint64))
+		c, d = ksStart(v64(keyUint64))
 
 		mode   desECB
-		subkey qw
+		subkey v64
 	)
 	for i := 0; i < rounds; i++ {
 		c, d, subkey = ksNext(c, d, i+1)
@@ -183,16 +181,16 @@ func NewDESECBEncrypter(key []byte) cipher.BlockMode {
 // its effective size is only 56 bits as the least significant bit from each
 // byte is ignored.
 func NewDESECBDecrypter(key []byte) cipher.BlockMode {
-	if len(key) != qwSize {
+	if len(key) != v64Size {
 		panic(ErrKeySize)
 	}
 	keyUint64 := binary.LittleEndian.Uint64(key)
 
 	var (
-		c, d = ksStart(qw(keyUint64))
+		c, d = ksStart(v64(keyUint64))
 
 		mode   desECB
-		subkey qw
+		subkey v64
 	)
 	for i := 0; i < rounds; i++ {
 		c, d, subkey = ksNext(c, d, i+1)
@@ -206,7 +204,7 @@ func NewDESECBDecrypter(key []byte) cipher.BlockMode {
 // effective size however, is only 168 bits as the least significant bit from
 // each byte is ignored.
 func NewDES3ECBEncrypter(key []byte) cipher.BlockMode {
-	if len(key) != qwSize*3 {
+	if len(key) != v64Size*3 {
 		panic(ErrKeySize)
 	}
 	key1Uint64 := binary.LittleEndian.Uint64(key[:8])
@@ -214,12 +212,12 @@ func NewDES3ECBEncrypter(key []byte) cipher.BlockMode {
 	key3Uint64 := binary.LittleEndian.Uint64(key[16:])
 
 	var (
-		c1, d1 = ksStart(qw(key1Uint64))
-		c2, d2 = ksStart(qw(key2Uint64))
-		c3, d3 = ksStart(qw(key3Uint64))
+		c1, d1 = ksStart(v64(key1Uint64))
+		c2, d2 = ksStart(v64(key2Uint64))
+		c3, d3 = ksStart(v64(key3Uint64))
 
 		mode   desTripleECB
-		subkey qw
+		subkey v64
 	)
 	for i := 0; i < rounds; i++ {
 		c1, d1, subkey = ksNext(c1, d1, i+1)
@@ -237,7 +235,7 @@ func NewDES3ECBEncrypter(key []byte) cipher.BlockMode {
 // effective size however, is only 168 bits as the least significant bit from
 // each byte is ignored.
 func NewDES3ECBDecrypter(key []byte) cipher.BlockMode {
-	if len(key) != qwSize*3 {
+	if len(key) != v64Size*3 {
 		panic(ErrKeySize)
 	}
 	key1Uint64 := binary.LittleEndian.Uint64(key[:8])
@@ -245,12 +243,12 @@ func NewDES3ECBDecrypter(key []byte) cipher.BlockMode {
 	key3Uint64 := binary.LittleEndian.Uint64(key[16:])
 
 	var (
-		c1, d1 = ksStart(qw(key1Uint64))
-		c2, d2 = ksStart(qw(key2Uint64))
-		c3, d3 = ksStart(qw(key3Uint64))
+		c1, d1 = ksStart(v64(key1Uint64))
+		c2, d2 = ksStart(v64(key2Uint64))
+		c3, d3 = ksStart(v64(key3Uint64))
 
 		mode   desTripleECB
-		subkey qw
+		subkey v64
 	)
 	for i := 0; i < rounds; i++ {
 		c1, d1, subkey = ksNext(c1, d1, i+1)

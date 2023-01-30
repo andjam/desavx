@@ -48,7 +48,7 @@ TEXT bitGroupLeftRotateVec2(SB),NOSPLIT|NOFRAME,$0
 	VPSLLQ X2, X4, X2
 	VPXOR  X1, X2, X1
 
-	MOVQ   $const_qwSize*8, R14
+	MOVQ   $const_v64Size*8, R14
 	SUBQ   wrap, R14
 	MOVQ   R14, X3
 	VPSLLQ X3, X1, X1

@@ -33,9 +33,9 @@ TEXT feistel(SB),NOSPLIT,$56
 #define in         X0
 #define out        X0
 	MOVQ   AX, subkeysptr
-	VPSRLQ $const_dwSize*8, in, X8
-	VPSLLQ $const_dwSize*8, in, X9
-	VPSRLQ $const_dwSize*8, X9, X9
+	VPSRLQ $const_v32Size*8, in, X8
+	VPSLLQ $const_v32Size*8, in, X9
+	VPSRLQ $const_v32Size*8, X9, X9
 
 	MOVQ   $0, SI
 
@@ -53,7 +53,7 @@ loopstart:
 	CMPQ SI, $const_rounds
 	JNE  loopstart
 
-	VPSLLQ $const_dwSize*8, X9, X9
+	VPSLLQ $const_v32Size*8, X9, X9
 	VPXOR  X9, X8, out
 #undef subkeysptr
 #undef in
@@ -91,11 +91,11 @@ TEXT ·desECBCrypt(SB),NOSPLIT,$56
 
 crypttwo:
 	MOVQ dstptr, dstnxt
-	ADDQ $const_qwSize*2, dstnxt
+	ADDQ $const_v64Size*2, dstnxt
 	CMPQ dstnxt, dstlen
 	JG   cryptone
 	MOVQ srcptr, srcnxtptr
-	ADDQ $const_qwSize*2, srcnxtptr
+	ADDQ $const_v64Size*2, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptone
 
@@ -113,11 +113,11 @@ crypttwo:
 cryptone:
 	MOVQ dstptr, dstnxt
 	XORQ R14, R14
-	ADDQ $const_qwSize, R14
+	ADDQ $const_v64Size, R14
 	CMPQ R14, dstlen
 	JG   cryptoneend
 	MOVQ srcptr, srcnxtptr
-	ADDQ $const_qwSize, srcnxtptr
+	ADDQ $const_v64Size, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptoneend
 	
@@ -171,11 +171,11 @@ TEXT ·desTripleECBCrypt(SB),NOSPLIT,$72
 
 crypttwo:
 	MOVQ dstptr, dstnxt
-	ADDQ $const_qwSize*2, dstnxt
+	ADDQ $const_v64Size*2, dstnxt
 	CMPQ dstnxt, dstlen
 	JG   cryptone
 	MOVQ srcptr, srcnxtptr
-	ADDQ $const_qwSize*2, srcnxtptr
+	ADDQ $const_v64Size*2, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptone
 
@@ -184,10 +184,10 @@ crypttwo:
 	MOVQ    subkeysptr, AX
 	CALL    feistel(SB)
 	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_qwSize, AX
+	ADDQ    $const_rounds*const_v64Size, AX
 	CALL    feistel(SB)
 	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_qwSize*2, AX
+	ADDQ    $const_rounds*const_v64Size*2, AX
 	CALL    feistel(SB)
 	CALL    ipInverseVec2(SB)
 	VMOVDQU X0, (dstptr)
@@ -199,11 +199,11 @@ crypttwo:
 cryptone:
 	MOVQ dstptr, dstnxt
 	XORQ R14, R14
-	ADDQ $const_qwSize, R14
+	ADDQ $const_v64Size, R14
 	CMPQ R14, dstlen
 	JG   cryptoneend
 	MOVQ srcptr, srcnxtptr
-	ADDQ $const_qwSize, srcnxtptr
+	ADDQ $const_v64Size, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptoneend
 	
@@ -212,10 +212,10 @@ cryptone:
 	MOVQ subkeysptr, AX
 	CALL feistel(SB)
 	MOVQ subkeysptr, AX
-	ADDQ $const_rounds*const_qwSize, AX
+	ADDQ $const_rounds*const_v64Size, AX
 	CALL feistel(SB)
 	MOVQ subkeysptr, AX
-	ADDQ $const_rounds*const_qwSize*2, AX
+	ADDQ $const_rounds*const_v64Size*2, AX
 	CALL feistel(SB)
 	CALL ipInverseVec2(SB)
 	MOVQ X0, (dstptr)
