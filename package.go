@@ -71,7 +71,7 @@ func (_ desECB) BlockSize() int {
 }
 
 // CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst. It
-// proceeds in 16 rounds using subkey[i] in round i.
+// proceeds in 16 rounds using subkey subkeys[i] in round i.
 //
 // The length of src must be a multiple of 8 (the block size) and no greater
 // than the length dst or CryptBlocks will panic. Additional care must to taken
