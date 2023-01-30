@@ -4,65 +4,47 @@
 #include "textflag.h"
 #include "go_asm.h"
 
-TEXT f(SB),NOSPLIT,$8
-	MOVQ R8, (SP)
-#define subkey R8
-#define in     X0
-#define out    X0
-	MOVQ AX, subkey
-	CALL eVec2(SB)
+TEXT feistel(SB),NOSPLIT,$48
+#define subkeysptr AX // *[rounds]v64
+#define in         X0 // [2]v64
+#define out        X0 // [2]v64
 
-	MOVQ         subkey, X1
-	VPBROADCASTQ X1, X1
-	VPXOR        X0, X1, X0
-	CALL         substitutionVec2(SB)
-	CALL         pVec2(SB)
-#undef subkey
-#undef in
-#undef out
-	MOVQ (SP), R8
-	RET
-
-TEXT feistel(SB),NOSPLIT,$56
 	MOVQ    SI, (SP)
-	MOVQ    R8, 8(SP)
-	MOVQ    R9, 16(SP)
-	VMOVDQU X8, 24(SP)
-	VMOVDQU X9, 40(SP)
-#define subkeysptr R8
-#define in         X0
-#define out        X0
-	MOVQ   AX, subkeysptr
-	VPSRLQ $const_v32Size*8, in, X8
-	VPSLLQ $const_v32Size*8, in, X9
-	VPSRLQ $const_v32Size*8, X9, X9
+	VMOVDQU X8, 16(SP)
+	VMOVDQU X9, 32(SP)
+#define left  X8
+#define right X9
+	VPSRLQ $const_v32Size*8, in, left
+	VPSLLQ $const_v32Size*8, in, right
+	VPSRLQ $const_v32Size*8, right, right
 
-	MOVQ   $0, SI
+	LEAQ const_rounds*const_v64Size(subkeysptr), R15
+	MOVQ subkeysptr, SI
 
 loopstart:
-	MOVQ    (subkeysptr)(SI*8), R9
-	MOVQ    R9, AX
-	VMOVDQU X9, X0
-	CALL    f(SB)
+	MOVQ    (SI), AX
+	VMOVDQU right, out
+	CALL    fVec2(SB)
+	VPXOR   left, out, out
+	VMOVDQU right, left
+	VMOVDQU out, right
 
-	VPXOR   X8, X0, X0
-	VMOVDQU X9, X8
-	VMOVDQU X0, X9
-
-	INCQ SI
-	CMPQ SI, $const_rounds
+	ADDQ $const_v64Size, SI
+	CMPQ SI, R15
 	JNE  loopstart
 
-	VPSLLQ $const_v32Size*8, X9, X9
-	VPXOR  X9, X8, out
+	VPSLLQ $const_v32Size*8, right, right
+	VPXOR  right, left, out
+
+#undef left
+#undef right
+	MOVQ (SP), SI
+	VMOVDQU 16(SP), X8
+	VMOVDQU 32(SP), X9
+
 #undef subkeysptr
 #undef in
 #undef out
-	MOVQ    (SP), SI
-	MOVQ    8(SP), R8
-	MOVQ    16(SP), R9
-	VMOVDQU 24(SP), X8
-	VMOVDQU 40(SP), X9
 	RET
 
 TEXT ·desECBCrypt(SB),NOSPLIT,$56
@@ -71,21 +53,21 @@ TEXT ·desECBCrypt(SB),NOSPLIT,$56
 	MOVQ R12, 16(SP)
 	MOVQ SI, 24(SP)
 	MOVQ R13, 32(SP)
-#define subkeysptr R8
-#define dstptr     DI
-#define dstlen     R12
-#define srcptr     SI
-#define srclen     R13
-	MOVQ R9, 40(SP)
-	MOVQ R11, 48(SP)
-#define dstnxt R9
-#define srcnxtptr R11
+#define subkeysptr R8  // *[rounds]v64
+#define dstptr     DI  // []byte
+#define dstlen     R12 // int
+#define srcptr     SI  // []byte
+#define srclen     R13 // int
 	MOVQ main·subkeys(FP), subkeysptr
 	MOVQ ·dst_base+8(FP), dstptr
 	MOVQ ·dst_len+16(FP), dstlen
 	MOVQ ·src_base+32(FP), srcptr
 	MOVQ ·src_len+40(FP), srclen
 
+	MOVQ R9, 40(SP)
+	MOVQ R11, 48(SP)
+#define dstnxt R9
+#define srcnxtptr R11
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
@@ -129,10 +111,12 @@ cryptone:
 	MOVQ X0, (dstptr)
 
 cryptoneend:
+
 #undef dstnxt
 #undef srcnxtptr
 	MOVQ 40(SP), R9
 	MOVQ 48(SP), R11
+
 #undef subkeysptr
 #undef dstptr
 #undef dstlen
@@ -151,21 +135,21 @@ TEXT ·desTripleECBCrypt(SB),NOSPLIT,$72
 	MOVQ R12, 16(SP)
 	MOVQ SI, 24(SP)
 	MOVQ R13, 32(SP)
-#define subkeysptr R8
-#define dstptr     DI
-#define dstlen     R12
-#define srcptr     SI
-#define srclen     R13
-	MOVQ R9, 40(SP)
-	MOVQ R11, 48(SP)
-#define dstnxt R9
-#define srcnxtptr R11
+#define subkeysptr R8  // *[3][rounds]v64
+#define dstptr     DI  // []byte
+#define dstlen     R12 // int
+#define srcptr     SI  // []byte
+#define srclen     R13 // int
 	MOVQ main·subkeysTriple(FP), subkeysptr
 	MOVQ ·dst_base+8(FP), dstptr
 	MOVQ ·dst_len+16(FP), dstlen
 	MOVQ ·src_base+32(FP), srcptr
 	MOVQ ·src_len+40(FP), srclen
 
+	MOVQ R9, 40(SP)
+	MOVQ R11, 48(SP)
+#define dstnxt R9
+#define srcnxtptr R11
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
@@ -221,10 +205,12 @@ cryptone:
 	MOVQ X0, (dstptr)
 
 cryptoneend:
+
 #undef dstnxt
 #undef srcnxtptr
 	MOVQ 40(SP), R9
 	MOVQ 48(SP), R11
+
 #undef subkeysptr
 #undef dstptr
 #undef dstlen

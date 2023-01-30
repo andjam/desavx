@@ -58,6 +58,27 @@ func init() {
 	}
 }
 
+// pc1 performs the bit selections Permuted Choice 1 described in HoAC table
+// 7.4.
+func pc1(in v64) v64
+
+// pc2 performs the bit selections Permuted Choice 2 described in HoAC table
+// 7.4.
+func pc2(in v64) v64
+
+// desECBCrypt (encrypts or decrypts) bytes from src to dst using DES in
+// electronic coodebook mode. It proceeds in 16 rounds using subkey
+// (*subkeys)[i] in round i and continues to process blocks until it reaches
+// the end of src or dst. Only blocks up to a multiple of 8 are processed, any
+// additional data in src is ignored.
+func desECBCrypt(subkeys *[rounds]v64, dst []byte, src []byte)
+
+// desTripleECBCrypt triple encrypts (or decrypts) bytes from src to dst using
+// DES in electronic coodebook mode. It works like applying three stages of
+// desECBCrypt consecutively using the 16 subkeys in (*subkeysTriple)[i] in
+// stage i.
+func desTripleECBCrypt(subkeysTriple *[3][rounds]v64, dst, src []byte)
+
 // desECB is a cipher.BlockMode compatible type which encrypts (or decrypts)
 // plaintext bytes using DES in electronic coodebook mode. The 16 48-bit DES
 // subkeys are stored in the lower 48 bits of the 16 v64 items in the subkeys
@@ -70,8 +91,7 @@ func (_ desECB) BlockSize() int {
 	return v64Size
 }
 
-// CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst. It
-// proceeds in 16 rounds using subkey subkeys[i] in round i.
+// CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst.
 //
 // The length of src must be a multiple of 8 (the block size) and no greater
 // than the length dst or CryptBlocks will panic. Additional care must to taken
@@ -100,9 +120,7 @@ func (_ desTripleECB) BlockSize() int {
 	return v64Size
 }
 
-// CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst. It
-// applies three stages of DES consecutively using the 16 subkeys in subkeys<i>
-// in stage i.
+// CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst.
 //
 // The length of src must be a multiple of 8 (the block size) and no greater
 // than the length dst or CryptBlocks will panic. Additional care must to taken
