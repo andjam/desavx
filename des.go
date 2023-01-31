@@ -46,14 +46,14 @@ const (
 )
 
 var (
-	ErrAVXSupport = errors.New("desavx: AVX support required")
+	ErrAVXSupport = errors.New("desavx: AVX2 support required")
 	ErrKeySize    = errors.New("desavx: invalid key size")
 	ErrInputSize  = errors.New("desavx: invalid input size")
 	ErrInternal   = errors.New("desavx: something unexpected happened")
 )
 
 func init() {
-	if !cpu.X86.HasAVX {
+	if !cpu.X86.HasAVX2 {
 		panic(ErrAVXSupport)
 	}
 }

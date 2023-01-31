@@ -4,33 +4,38 @@
 #include "textflag.h"
 #include "go_asm.h"
 
-TEXT feistel(SB),NOSPLIT,$48
+TEXT feistel(SB),NOSPLIT,$80
 #define subkeysptr AX // *[rounds]v64
-#define in         X0 // [2]v64
-#define out        X0 // [2]v64
+#define in         Y0 // [4]v64
+#define out        Y0 // [4]v64
 
 	MOVQ    SI, (SP)
-	VMOVDQU X8, 16(SP)
-	VMOVDQU X9, 32(SP)
-#define left  X8
-#define right X9
+	MOVQ    R8, 8(SP)
+	VMOVDQU Y8, 16(SP)
+	VMOVDQU Y9, 48(SP)
+#define left  Y8
+#define right Y9
 	VPSRLQ $const_v32Size*8, in, left
 	VPSLLQ $const_v32Size*8, in, right
 	VPSRLQ $const_v32Size*8, right, right
 
-	LEAQ const_rounds*const_v64Size(subkeysptr), R15
+	LEAQ const_rounds*const_v64Size(subkeysptr), R8
 	MOVQ subkeysptr, SI
+
+	MOVQ         $0x8000000000000000, DX
+	MOVQ         DX, X6
+	VPBROADCASTQ X6, Y6
 
 loopstart:
 	MOVQ    (SI), AX
 	VMOVDQU right, out
-	CALL    fVec2(SB)
+	CALL    fVec4(SB)
 	VPXOR   left, out, out
 	VMOVDQU right, left
 	VMOVDQU out, right
 
 	ADDQ $const_v64Size, SI
-	CMPQ SI, R15
+	CMPQ SI, R8
 	JNE  loopstart
 
 	VPSLLQ $const_v32Size*8, right, right
@@ -38,9 +43,10 @@ loopstart:
 
 #undef left
 #undef right
-	MOVQ (SP), SI
-	VMOVDQU 16(SP), X8
-	VMOVDQU 32(SP), X9
+	MOVQ    (SP), SI
+	MOVQ    8(SP), R8
+	VMOVDQU 16(SP), Y8
+	VMOVDQU 48(SP), Y9
 
 #undef subkeysptr
 #undef in
@@ -50,8 +56,8 @@ loopstart:
 TEXT ·desECBCrypt(SB),NOSPLIT,$56
 	MOVQ R8, (SP)
 	MOVQ DI, 8(SP)
-	MOVQ R12, 16(SP)
-	MOVQ SI, 24(SP)
+	MOVQ SI, 16(SP)
+	MOVQ R12, 24(SP)
 	MOVQ R13, 32(SP)
 #define subkeysptr R8  // *[rounds]v64
 #define dstptr     DI  // []byte
@@ -71,6 +77,52 @@ TEXT ·desECBCrypt(SB),NOSPLIT,$56
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
+cryptfour:
+	MOVQ dstptr, dstnxt
+	ADDQ $const_v64Size*4, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   cryptthree
+	MOVQ srcptr, srcnxtptr
+	ADDQ $const_v64Size*4, srcnxtptr
+	CMPQ srcnxtptr, srclen
+	JG   cryptthree
+
+	VMOVDQU (srcptr), Y0
+	CALL    ipVec4(SB)
+	MOVQ    subkeysptr, AX
+	CALL    feistel(SB)
+	CALL    ipInverseVec4(SB)
+	VMOVDQU Y0, (dstptr)
+
+	MOVQ dstnxt, dstptr
+	MOVQ srcnxtptr, srcptr
+	JMP  cryptfour
+
+cryptthree:
+	MOVQ dstptr, dstnxt
+	ADDQ $const_v64Size*3, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   crypttwo
+	MOVQ srcptr, srcnxtptr
+	ADDQ $const_v64Size*3, srcnxtptr
+	CMPQ srcnxtptr, srclen
+	JG   crypttwo
+	
+	VPXOR        Y0, Y0, Y0
+	PINSRQ       $0, const_v64Size*2(srcptr), X0
+	VINSERTI128  $1, X0, Y0, Y0
+	PINSRQ       $1, const_v64Size(srcptr), X0
+	PINSRQ       $0, (srcptr), X0
+	CALL         ipVec4(SB)
+	MOVQ         subkeysptr, AX
+	CALL         feistel(SB)
+	CALL         ipInverseVec4(SB)
+	PEXTRQ       $0, X0, (dstptr)
+	PEXTRQ       $1, X0, const_v64Size(dstptr)
+	VEXTRACTI128 $1, Y0, X0
+	PEXTRQ       $0, X0, const_v64Size*2(dstptr)
+	JMP          cryptend
+
 crypttwo:
 	MOVQ dstptr, dstnxt
 	ADDQ $const_v64Size*2, dstnxt
@@ -80,37 +132,35 @@ crypttwo:
 	ADDQ $const_v64Size*2, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptone
-
-	VMOVDQU (srcptr), X0
-	CALL    ipVec2(SB)
-	MOVQ    subkeysptr, AX
-	CALL    feistel(SB)
-	CALL    ipInverseVec2(SB)
-	VMOVDQU X0, (dstptr)
-
-	MOVQ dstnxt, dstptr
-	MOVQ srcnxtptr, srcptr
-	JMP crypttwo
+	
+	PINSRQ $0, (srcptr), X0
+	PINSRQ $1, const_v64Size(srcptr), X0
+	CALL   ipVec4(SB)
+	MOVQ   subkeysptr, AX
+	CALL   feistel(SB)
+	CALL   ipInverseVec4(SB)
+	PEXTRQ $0, X0, (dstptr)
+	PEXTRQ $1, X0, const_v64Size(dstptr)
+	JMP    cryptend
 
 cryptone:
 	MOVQ dstptr, dstnxt
-	XORQ R14, R14
-	ADDQ $const_v64Size, R14
-	CMPQ R14, dstlen
-	JG   cryptoneend
+	ADDQ $const_v64Size, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   cryptend
 	MOVQ srcptr, srcnxtptr
 	ADDQ $const_v64Size, srcnxtptr
 	CMPQ srcnxtptr, srclen
-	JG   cryptoneend
+	JG   cryptend
 	
 	MOVQ (srcptr), X0
-	CALL ipVec2(SB)
+	CALL ipVec4(SB)
 	MOVQ subkeysptr, AX
 	CALL feistel(SB)
-	CALL ipInverseVec2(SB)
+	CALL ipInverseVec4(SB)
 	MOVQ X0, (dstptr)
 
-cryptoneend:
+cryptend:
 
 #undef dstnxt
 #undef srcnxtptr
@@ -124,16 +174,16 @@ cryptoneend:
 #undef srclen
 	MOVQ R8, (SP)
 	MOVQ DI, 8(SP)
-	MOVQ R12, 16(SP)
-	MOVQ SI, 24(SP)
+	MOVQ SI, 16(SP)
+	MOVQ R12, 24(SP)
 	MOVQ R13, 32(SP)
 	RET
 
 TEXT ·desTripleECBCrypt(SB),NOSPLIT,$72
 	MOVQ R8, (SP)
 	MOVQ DI, 8(SP)
-	MOVQ R12, 16(SP)
-	MOVQ SI, 24(SP)
+	MOVQ SI, 16(SP)
+	MOVQ R12, 24(SP)
 	MOVQ R13, 32(SP)
 #define subkeysptr R8  // *[3][rounds]v64
 #define dstptr     DI  // []byte
@@ -153,6 +203,64 @@ TEXT ·desTripleECBCrypt(SB),NOSPLIT,$72
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
+cryptfour:
+	MOVQ dstptr, dstnxt
+	ADDQ $const_v64Size*4, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   cryptthree
+	MOVQ srcptr, srcnxtptr
+	ADDQ $const_v64Size*4, srcnxtptr
+	CMPQ srcnxtptr, srclen
+	JG   cryptthree
+
+	VMOVDQU (srcptr), Y0
+	CALL    ipVec4(SB)
+	MOVQ    subkeysptr, AX
+	CALL    feistel(SB)
+	MOVQ    subkeysptr, AX
+	ADDQ    $const_rounds*const_v64Size, AX
+	CALL    feistel(SB)
+	MOVQ    subkeysptr, AX
+	ADDQ    $const_rounds*const_v64Size*2, AX
+	CALL    feistel(SB)
+	CALL    ipInverseVec4(SB)
+	VMOVDQU Y0, (dstptr)
+
+	MOVQ dstnxt, dstptr
+	MOVQ srcnxtptr, srcptr
+	JMP  cryptfour
+
+cryptthree:
+	MOVQ dstptr, dstnxt
+	ADDQ $const_v64Size*3, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   crypttwo
+	MOVQ srcptr, srcnxtptr
+	ADDQ $const_v64Size*3, srcnxtptr
+	CMPQ srcnxtptr, srclen
+	JG   crypttwo
+	
+	VPXOR        Y0, Y0, Y0
+	PINSRQ       $0, const_v64Size*2(srcptr), X0
+	VINSERTI128  $1, X0, Y0, Y0
+	PINSRQ       $1, const_v64Size(srcptr), X0
+	PINSRQ       $0, (srcptr), X0
+	CALL         ipVec4(SB)
+	MOVQ         subkeysptr, AX
+	CALL         feistel(SB)
+	MOVQ         subkeysptr, AX
+	ADDQ         $const_rounds*const_v64Size, AX
+	CALL         feistel(SB)
+	MOVQ         subkeysptr, AX
+	ADDQ         $const_rounds*const_v64Size*2, AX
+	CALL         feistel(SB)
+	CALL         ipInverseVec4(SB)
+	PEXTRQ       $0, X0, (dstptr)
+	PEXTRQ       $1, X0, const_v64Size(dstptr)
+	VEXTRACTI128 $1, Y0, X0
+	PEXTRQ       $0, X0, const_v64Size*2(dstptr)
+	JMP          cryptend
+
 crypttwo:
 	MOVQ dstptr, dstnxt
 	ADDQ $const_v64Size*2, dstnxt
@@ -162,37 +270,35 @@ crypttwo:
 	ADDQ $const_v64Size*2, srcnxtptr
 	CMPQ srcnxtptr, srclen
 	JG   cryptone
-
-	VMOVDQU (srcptr), X0
-	CALL    ipVec2(SB)
-	MOVQ    subkeysptr, AX
-	CALL    feistel(SB)
-	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_v64Size, AX
-	CALL    feistel(SB)
-	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_v64Size*2, AX
-	CALL    feistel(SB)
-	CALL    ipInverseVec2(SB)
-	VMOVDQU X0, (dstptr)
-
-	MOVQ dstnxt, dstptr
-	MOVQ srcnxtptr, srcptr
-	JMP crypttwo
+	
+	PINSRQ $0, (srcptr), X0
+	PINSRQ $1, const_v64Size(srcptr), X0
+	CALL   ipVec4(SB)
+	MOVQ   subkeysptr, AX
+	CALL   feistel(SB)
+	MOVQ   subkeysptr, AX
+	ADDQ   $const_rounds*const_v64Size, AX
+	CALL   feistel(SB)
+	MOVQ   subkeysptr, AX
+	ADDQ   $const_rounds*const_v64Size*2, AX
+	CALL   feistel(SB)
+	CALL   ipInverseVec4(SB)
+	PEXTRQ $0, X0, (dstptr)
+	PEXTRQ $1, X0, const_v64Size(dstptr)
+	JMP    cryptend
 
 cryptone:
 	MOVQ dstptr, dstnxt
-	XORQ R14, R14
-	ADDQ $const_v64Size, R14
-	CMPQ R14, dstlen
-	JG   cryptoneend
+	ADDQ $const_v64Size, dstnxt
+	CMPQ dstnxt, dstlen
+	JG   cryptend
 	MOVQ srcptr, srcnxtptr
 	ADDQ $const_v64Size, srcnxtptr
 	CMPQ srcnxtptr, srclen
-	JG   cryptoneend
+	JG   cryptend
 	
 	MOVQ (srcptr), X0
-	CALL ipVec2(SB)
+	CALL ipVec4(SB)
 	MOVQ subkeysptr, AX
 	CALL feistel(SB)
 	MOVQ subkeysptr, AX
@@ -201,10 +307,10 @@ cryptone:
 	MOVQ subkeysptr, AX
 	ADDQ $const_rounds*const_v64Size*2, AX
 	CALL feistel(SB)
-	CALL ipInverseVec2(SB)
+	CALL ipInverseVec4(SB)
 	MOVQ X0, (dstptr)
 
-cryptoneend:
+cryptend:
 
 #undef dstnxt
 #undef srcnxtptr
@@ -218,7 +324,7 @@ cryptoneend:
 #undef srclen
 	MOVQ R8, (SP)
 	MOVQ DI, 8(SP)
-	MOVQ R12, 16(SP)
-	MOVQ SI, 24(SP)
+	MOVQ SI, 16(SP)
+	MOVQ R12, 24(SP)
 	MOVQ R13, 32(SP)
 	RET
