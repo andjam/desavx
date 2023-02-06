@@ -1,4 +1,4 @@
-package desavx
+package des
 
 import (
 	"bytes"

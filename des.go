@@ -1,7 +1,7 @@
 //go:build amd64
 // +build amd64
 
-// Package desavx implements the Data Encryption Standard (DES) as described in
+// Package des-avx implements the Data Encryption Standard (DES) as described in
 // chapter 7.4 of Handbook of Applied Cryptography. DES proceeds in 16 rounds,
 // processing 64-bit plaintext blocks into 64-bit ciphertext blocks using a
 // 56-bit key. This implementation utilises x86 AVX extensions to work on
@@ -13,16 +13,16 @@
 //
 //  // DES keys must be 8 bytes
 //  key, _ := hex.DecodeString("deadbeefdeadc0de")
-//  desavx.NewDESECBEncrypter(key).CryptBlocks(ciphertext, plaintext) // Encrypt
-//  desavx.NewDESECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
+//  des.NewDESECBEncrypter(key).CryptBlocks(ciphertext, plaintext) // Encrypt
+//  des.NewDESECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
 //
 //  // DES3 keys must be 24 bytes
 //  key, _ = hex.DecodeString("deadbeefdeadc0defeedbabef00dbabebaadf00dbaaaaaad")
-//  desavx.NewDES3ECBEncrypter(key).CryptBlocks(ciphertext, ciphertext) // Encrypt
-//  desavx.NewDES3ECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
+//  des.NewDES3ECBEncrypter(key).CryptBlocks(ciphertext, ciphertext) // Encrypt
+//  des.NewDES3ECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
 //
 //  fmt.Println(string(ciphertext)) // exampleplaintext
-package desavx
+package des
 
 import (
 	"crypto/cipher"
@@ -46,10 +46,10 @@ const (
 )
 
 var (
-	ErrAVXSupport = errors.New("desavx: AVX2 support required")
-	ErrKeySize    = errors.New("desavx: invalid key size")
-	ErrInputSize  = errors.New("desavx: invalid input size")
-	ErrInternal   = errors.New("desavx: something unexpected happened")
+	ErrAVXSupport = errors.New("des-avx: AVX2 support required")
+	ErrKeySize    = errors.New("des-avx: invalid key size")
+	ErrInputSize  = errors.New("des-avx: invalid input size")
+	ErrInternal   = errors.New("des-avx: something unexpected happened")
 )
 
 func init() {
