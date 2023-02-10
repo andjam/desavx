@@ -163,7 +163,7 @@ func NewDESECBEncrypter(key []byte) cipher.BlockMode {
 	if len(key) != v64Size {
 		panic(ErrKeySize)
 	}
-	keyUint64 := binary.LittleEndian.Uint64(key)
+	keyUint64 := binary.BigEndian.Uint64(key)
 
 	var (
 		c, d = ksStart(v64(keyUint64))
@@ -186,7 +186,7 @@ func NewDESECBDecrypter(key []byte) cipher.BlockMode {
 	if len(key) != v64Size {
 		panic(ErrKeySize)
 	}
-	keyUint64 := binary.LittleEndian.Uint64(key)
+	keyUint64 := binary.BigEndian.Uint64(key)
 
 	var (
 		c, d = ksStart(v64(keyUint64))
@@ -209,9 +209,9 @@ func NewDES3ECBEncrypter(key []byte) cipher.BlockMode {
 	if len(key) != v64Size*3 {
 		panic(ErrKeySize)
 	}
-	key1Uint64 := binary.LittleEndian.Uint64(key[:8])
-	key2Uint64 := binary.LittleEndian.Uint64(key[8:16])
-	key3Uint64 := binary.LittleEndian.Uint64(key[16:])
+	key1Uint64 := binary.BigEndian.Uint64(key[:8])
+	key2Uint64 := binary.BigEndian.Uint64(key[8:16])
+	key3Uint64 := binary.BigEndian.Uint64(key[16:])
 
 	var (
 		c1, d1 = ksStart(v64(key1Uint64))
@@ -240,9 +240,9 @@ func NewDES3ECBDecrypter(key []byte) cipher.BlockMode {
 	if len(key) != v64Size*3 {
 		panic(ErrKeySize)
 	}
-	key1Uint64 := binary.LittleEndian.Uint64(key[:8])
-	key2Uint64 := binary.LittleEndian.Uint64(key[8:16])
-	key3Uint64 := binary.LittleEndian.Uint64(key[16:])
+	key1Uint64 := binary.BigEndian.Uint64(key[:8])
+	key2Uint64 := binary.BigEndian.Uint64(key[8:16])
+	key3Uint64 := binary.BigEndian.Uint64(key[16:])
 
 	var (
 		c1, d1 = ksStart(v64(key1Uint64))
