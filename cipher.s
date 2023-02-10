@@ -5,14 +5,14 @@
 #include "go_asm.h"
 
 TEXT feistel(SB),NOSPLIT,$80
-#define subkeysptr AX // *[rounds]v64
-#define in         Y0 // [4]v64
-#define out        Y0 // [4]v64
-
 	MOVQ    SI, (SP)
 	MOVQ    R8, 8(SP)
 	VMOVDQU Y8, 16(SP)
 	VMOVDQU Y9, 48(SP)
+#define subkeysptr AX // *[rounds]v64
+#define in         Y0 // [4]v64
+#define out        Y0 // [4]v64
+
 #define left  Y8
 #define right Y9
 	VPSRLQ $const_v32Size*8, in, left
@@ -43,14 +43,14 @@ loopstart:
 
 #undef left
 #undef right
-	MOVQ    (SP), SI
-	MOVQ    8(SP), R8
-	VMOVDQU 16(SP), Y8
-	VMOVDQU 48(SP), Y9
 
 #undef subkeysptr
 #undef in
 #undef out
+	MOVQ    (SP), SI
+	MOVQ    8(SP), R8
+	VMOVDQU 16(SP), Y8
+	VMOVDQU 48(SP), Y9
 	RET
 
 TEXT ·desECBCrypt(SB),NOSPLIT,$56
@@ -77,90 +77,73 @@ TEXT ·desECBCrypt(SB),NOSPLIT,$56
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
-cryptfour:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*4, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptthree
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*4, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptthree
-
+loopstart:
+	MOVQ    srcptr, srcnxtptr
+	ADDQ    $const_v64Size*4, srcnxtptr
+	CMPQ    srcnxtptr, srclen
+	JG      loadthree
 	VMOVDQU (srcptr), Y0
-	CALL    ipVec4(SB)
-	MOVQ    subkeysptr, AX
-	CALL    feistel(SB)
-	CALL    ipInverseVec4(SB)
-	VMOVDQU Y0, (dstptr)
 
-	MOVQ dstnxt, dstptr
-	MOVQ srcnxtptr, srcptr
-	JMP  cryptfour
-
-cryptthree:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*3, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   crypttwo
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*3, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   crypttwo
-	
-	VPXOR        Y0, Y0, Y0
-	PINSRQ       $0, const_v64Size*2(srcptr), X0
-	VINSERTI128  $1, X0, Y0, Y0
-	PINSRQ       $1, const_v64Size(srcptr), X0
-	PINSRQ       $0, (srcptr), X0
-	CALL         ipVec4(SB)
-	MOVQ         subkeysptr, AX
-	CALL         feistel(SB)
-	CALL         ipInverseVec4(SB)
-	PEXTRQ       $0, X0, (dstptr)
-	PEXTRQ       $1, X0, const_v64Size(dstptr)
-	VEXTRACTI128 $1, Y0, X0
-	PEXTRQ       $0, X0, const_v64Size*2(dstptr)
-	JMP          cryptend
-
-crypttwo:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*2, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptone
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*2, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptone
-	
-	PINSRQ $0, (srcptr), X0
-	PINSRQ $1, const_v64Size(srcptr), X0
-	CALL   ipVec4(SB)
-	MOVQ   subkeysptr, AX
-	CALL   feistel(SB)
-	CALL   ipInverseVec4(SB)
-	PEXTRQ $0, X0, (dstptr)
-	PEXTRQ $1, X0, const_v64Size(dstptr)
-	JMP    cryptend
-
-cryptone:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptend
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptend
-	
-	MOVQ (srcptr), X0
 	CALL ipVec4(SB)
 	MOVQ subkeysptr, AX
 	CALL feistel(SB)
 	CALL ipInverseVec4(SB)
-	MOVQ X0, (dstptr)
 
-cryptend:
+	MOVQ    dstptr, dstnxt
+	ADDQ    $const_v64Size*4, dstnxt
+	CMPQ    dstnxt, dstlen
+	JG      loadthree
+	VMOVDQU Y0, (dstptr)
+
+	MOVQ dstnxt, dstptr
+	MOVQ srcnxtptr, srcptr
+	JMP  loopstart
+
+loadthree:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size*3, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          loadtwo
+	PINSRQ      $0, const_v64Size*2(srcptr), X0
+	VINSERTI128 $1, X0, Y0, Y0
+loadtwo:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size*2, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          loadone
+	PINSRQ      $1, const_v64Size(srcptr), X0
+loadone:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          end
+	PINSRQ      $0, (srcptr), X0
+
+	CALL ipVec4(SB)
+	MOVQ subkeysptr, AX
+	CALL feistel(SB)
+	CALL ipInverseVec4(SB)
+
+extractthree:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size*3, dstnxt
+	CMPQ         dstnxt, dstlen
+	JG           extracttwo
+	VEXTRACTI128 $1, Y0, X1
+	PEXTRQ       $0, X1, const_v64Size*2(dstptr)
+extracttwo:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size*2, dstnxt
+	CMPQ         dstnxt, dstlen
+	JG           extractone
+	PEXTRQ       $1, X0, const_v64Size(dstptr)
+extractone:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size, dstnxt
+	CMPQ         dstnxt, dstlen
+	PEXTRQ       $0, X0, (dstptr)
+
+end:
 
 #undef dstnxt
 #undef srcnxtptr
@@ -203,114 +186,81 @@ TEXT ·desTripleECBCrypt(SB),NOSPLIT,$72
 	ADDQ dstptr, dstlen
 	ADDQ srcptr, srclen
 
-cryptfour:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*4, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptthree
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*4, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptthree
-
+loopstart:
+	MOVQ    dstptr, dstnxt
+	ADDQ    $const_v64Size*4, dstnxt
+	CMPQ    dstnxt, dstlen
+	JG      loadthree
 	VMOVDQU (srcptr), Y0
-	CALL    ipVec4(SB)
-	MOVQ    subkeysptr, AX
-	CALL    feistel(SB)
-	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_v64Size, AX
-	CALL    feistel(SB)
-	MOVQ    subkeysptr, AX
-	ADDQ    $const_rounds*const_v64Size*2, AX
-	CALL    feistel(SB)
-	CALL    ipInverseVec4(SB)
+
+	CALL ipVec4(SB)
+	LEAQ (subkeysptr), AX
+	CALL feistel(SB)
+	LEAQ const_rounds*const_v64Size(subkeysptr), AX
+	CALL feistel(SB)
+	LEAQ const_rounds*const_v64Size*2(subkeysptr), AX
+	CALL feistel(SB)
+	CALL ipInverseVec4(SB)
+
+	MOVQ    srcptr, srcnxtptr
+	ADDQ    $const_v64Size*4, srcnxtptr
+	CMPQ    srcnxtptr, srclen
+	JG      loadthree
 	VMOVDQU Y0, (dstptr)
 
 	MOVQ dstnxt, dstptr
 	MOVQ srcnxtptr, srcptr
-	JMP  cryptfour
+	JMP  loopstart
 
-cryptthree:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*3, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   crypttwo
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*3, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   crypttwo
-	
-	VPXOR        Y0, Y0, Y0
-	PINSRQ       $0, const_v64Size*2(srcptr), X0
-	VINSERTI128  $1, X0, Y0, Y0
-	PINSRQ       $1, const_v64Size(srcptr), X0
-	PINSRQ       $0, (srcptr), X0
-	CALL         ipVec4(SB)
-	MOVQ         subkeysptr, AX
-	CALL         feistel(SB)
-	MOVQ         subkeysptr, AX
-	ADDQ         $const_rounds*const_v64Size, AX
-	CALL         feistel(SB)
-	MOVQ         subkeysptr, AX
-	ADDQ         $const_rounds*const_v64Size*2, AX
-	CALL         feistel(SB)
-	CALL         ipInverseVec4(SB)
-	PEXTRQ       $0, X0, (dstptr)
-	PEXTRQ       $1, X0, const_v64Size(dstptr)
-	VEXTRACTI128 $1, Y0, X0
-	PEXTRQ       $0, X0, const_v64Size*2(dstptr)
-	JMP          cryptend
+loadthree:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size*3, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          loadtwo
+	PINSRQ      $0, const_v64Size*2(srcptr), X0
+	VINSERTI128 $1, X0, Y0, Y0
+loadtwo:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size*2, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          loadone
+	PINSRQ      $1, const_v64Size(srcptr), X0
+loadone:
+	MOVQ        srcptr, srcnxtptr
+	ADDQ        $const_v64Size, srcnxtptr
+	CMPQ        srcnxtptr, srclen
+	JG          end
+	PINSRQ      $0, (srcptr), X0
 
-crypttwo:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size*2, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptone
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size*2, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptone
-	
-	PINSRQ $0, (srcptr), X0
-	PINSRQ $1, const_v64Size(srcptr), X0
-	CALL   ipVec4(SB)
-	MOVQ   subkeysptr, AX
-	CALL   feistel(SB)
-	MOVQ   subkeysptr, AX
-	ADDQ   $const_rounds*const_v64Size, AX
-	CALL   feistel(SB)
-	MOVQ   subkeysptr, AX
-	ADDQ   $const_rounds*const_v64Size*2, AX
-	CALL   feistel(SB)
-	CALL   ipInverseVec4(SB)
-	PEXTRQ $0, X0, (dstptr)
-	PEXTRQ $1, X0, const_v64Size(dstptr)
-	JMP    cryptend
-
-cryptone:
-	MOVQ dstptr, dstnxt
-	ADDQ $const_v64Size, dstnxt
-	CMPQ dstnxt, dstlen
-	JG   cryptend
-	MOVQ srcptr, srcnxtptr
-	ADDQ $const_v64Size, srcnxtptr
-	CMPQ srcnxtptr, srclen
-	JG   cryptend
-	
-	MOVQ (srcptr), X0
 	CALL ipVec4(SB)
-	MOVQ subkeysptr, AX
+	LEAQ (subkeysptr), AX
 	CALL feistel(SB)
-	MOVQ subkeysptr, AX
-	ADDQ $const_rounds*const_v64Size, AX
+	LEAQ const_rounds*const_v64Size(subkeysptr), AX
 	CALL feistel(SB)
-	MOVQ subkeysptr, AX
-	ADDQ $const_rounds*const_v64Size*2, AX
+	LEAQ const_rounds*const_v64Size*2(subkeysptr), AX
 	CALL feistel(SB)
 	CALL ipInverseVec4(SB)
-	MOVQ X0, (dstptr)
 
-cryptend:
+extractthree:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size*3, dstnxt
+	CMPQ         dstnxt, dstlen
+	JG           extracttwo
+	VEXTRACTI128 $1, Y0, X1
+	PEXTRQ       $0, X1, const_v64Size*2(dstptr)
+extracttwo:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size*2, dstnxt
+	CMPQ         dstnxt, dstlen
+	JG           extractone
+	PEXTRQ       $1, X0, const_v64Size(dstptr)
+extractone:
+	MOVQ         dstptr, dstnxt
+	ADDQ         $const_v64Size, dstnxt
+	CMPQ         dstnxt, dstlen
+	PEXTRQ       $0, X0, (dstptr)
+
+end:
 
 #undef dstnxt
 #undef srcnxtptr
