@@ -1,12 +1,12 @@
 //go:build amd64
 // +build amd64
 
-// Package des-avx implements the Data Encryption Standard (DES) as described
+// Package desavx implements the Data Encryption Standard (DES) as described
 // in chapter 7.4 of Handbook of Applied Cryptography, 1997. DES proceeds in 16
 // rounds, processing 64-bit plaintext blocks into 64-bit ciphertext blocks
 // using a 56-bit key. This implementation utilises x86 AVX extensions to work
 // on multiple blocks of plaintext simultaneously.
-package des
+package desavx
 
 import (
 	"crypto/cipher"
@@ -30,10 +30,10 @@ const (
 )
 
 var (
-	ErrAVXSupport = errors.New("des-avx: AVX2 support required")
-	ErrKeySize    = errors.New("des-avx: invalid key size")
-	ErrInputSize  = errors.New("des-avx: invalid input size")
-	ErrInternal   = errors.New("des-avx: something unexpected happened")
+	ErrAVXSupport = errors.New("desavx: AVX2 support required")
+	ErrKeySize    = errors.New("desavx: invalid key size")
+	ErrInputSize  = errors.New("desavx: invalid input size")
+	ErrInternal   = errors.New("desavx: something unexpected happened")
 )
 
 func init() {

@@ -1,10 +1,10 @@
-package des_test
+package desavx_test
 
 import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/andjam/des-avx"
+	"github.com/andjam/desavx"
 )
 
 func Example() {
@@ -14,13 +14,13 @@ func Example() {
 
 	// DES keys must be 8 bytes
 	key, _ := hex.DecodeString("deadbeefdeadc0de")
-	des.NewDESECBEncrypter(key).CryptBlocks(ciphertext, plaintext)  // Encrypt
-	des.NewDESECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
+	desavx.NewDESECBEncrypter(key).CryptBlocks(ciphertext, plaintext)  // Encrypt
+	desavx.NewDESECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
 
 	// DES3 keys must be 24 bytes
 	key, _ = hex.DecodeString("deadbeefdeadc0defeedbabef00dbabebaadf00dbaaaaaad")
-	des.NewDES3ECBEncrypter(key).CryptBlocks(ciphertext, ciphertext) // Encrypt
-	des.NewDES3ECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
+	desavx.NewDES3ECBEncrypter(key).CryptBlocks(ciphertext, ciphertext) // Encrypt
+	desavx.NewDES3ECBDecrypter(key).CryptBlocks(ciphertext, ciphertext) // Decrypt
 
 	fmt.Println(string(ciphertext)) // Output: exampleplaintext
 }
