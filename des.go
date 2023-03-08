@@ -78,7 +78,7 @@ func (_ desECB) BlockSize() int {
 // CryptBlocks encrypts (or decrypts) plaintext bytes from src to dst.
 //
 // The length of src must be a multiple of 8 (the block size) and no greater
-// than the length dst or CryptBlocks will panic. Additional care must to taken
+// than the length dst or CryptBlocks will panic. Additional care must be taken
 // to ensure src and dst do not overlap.
 func (de desECB) CryptBlocks(dst, src []byte) {
 	if len(src)%v64Size != 0 {
@@ -147,7 +147,7 @@ func ksStart(key v64) (c, d v64) {
 
 // Continue the key schedule described in HoAC 7.83. Compute the 28-bit C and D
 // values (stored in the lower 28 bits of c and d), and subkey for round i, from
-// the C and D values from the previous round.
+// the C and D values of the previous round.
 func ksNext(cprev, dprev v64, i int) (c, d, subkey v64) {
 	c = rotation(cprev, i)
 	d = rotation(dprev, i)
@@ -179,9 +179,9 @@ func NewDESECBEncrypter(key []byte) cipher.BlockMode {
 }
 
 // NewDESECBDecrypter returns a cipher.BlockMode which decrypts messages using
-// DES in electronic coodebook mode. The key should be 8 bytes long, however,
-// its effective size is only 56 bits as the least significant bit from each
-// byte is ignored.
+// DES in electronic coodebook mode. The key should be 8 bytes long, its
+// effective size however, is only 56 bits as the least significant bit from
+// each byte is ignored.
 func NewDESECBDecrypter(key []byte) cipher.BlockMode {
 	if len(key) != v64Size {
 		panic(ErrKeySize)
